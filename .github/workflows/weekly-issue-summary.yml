@@ -1,0 +1,30 @@
+name: Weekly Issue Summary
+
+on:
+    push:
+      branches:
+        - feat/models
+
+permissions:
+  issues: write
+  contents: read
+  models: read
+
+jobs:
+  create_weekly_summary:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install gh-models extension
+        run: gh extension install https://github.com/github/gh-models
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Get issues from the past week and summarize
+        id: get_issues
+        run: |-
+           LAST_WEEK=$(date -d "7 days ago" +"%Y-%m-%d")
+           gh search issues "created:>$LAST_WEEK" --state=open --json title,body,url --repo ${{ github.repository }} > issues.json
+           cat issues.json
+        env:
+          GH_TOKEN: ${{ github.token }}
