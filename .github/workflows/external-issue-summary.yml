@@ -1,0 +1,56 @@
+name: External Repo Issue Summary
+
+on:
+  push:
+    branches:
+      - feat/models
+permissions:
+  contents: read
+  issues: write
+  models: read
+
+jobs:
+  summary:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      SOURCE_REPO: kubernetes-retired/dashboard
+      TARGET_REPO: romdhanisam/Triage-Party-With-Agentic-Workflows
+      SUMMARY_ISSUE_TITLE: Triage Summary
+    steps:
+      - uses: actions/checkout@v4
+
+      - run: gh extension install https://github.com/github/gh-models || gh extension upgrade gh-models
+
+      - name: Collect from source repo
+        run: |
+          CUTOFF_DATE="$(date -u -d '4 years ago' +%Y-%m-%d)"
+          gh issue list \
+            --repo "$SOURCE_REPO" \
+            --state open \
+            --limit 500 \
+            --search "created:<${CUTOFF_DATE} sort:created-asc" \
+            --json number,title,body,createdAt,updatedAt \
+            > old_issues.json
+
+      - name: Build report
+        run: |
+          jq -r '
+            "## Open Issues Requiring Attention\n" +
+            (sort_by(.createdAt)[:10] | map("- " + .title + " (open since " + .createdAt[0:10] + ")") | join("\n")) +
+            "\n\n## Actionable Next Steps\n1. Triage top 3 oldest.\n2. Add labels.\n3. Assign owner.\n4. Set milestone."
+          ' old_issues.json > report.md
+
+      - name: Create/update issue in target repo only
+        run: |
+          ISSUE_NUMBER="$(
+            gh issue list --repo "$TARGET_REPO" --state open --limit 200 --json number,title \
+            | jq -r --arg t "$SUMMARY_ISSUE_TITLE" '.[] | select(.title == $t) | .number' \
+            | awk 'NR==1'
+          )"
+
+          if [ -n "$ISSUE_NUMBER" ]; then
+            gh issue comment "$ISSUE_NUMBER" --repo "$TARGET_REPO" --body-file report.md
+          else
+            gh issue create --repo "$TARGET_REPO" --title "$SUMMARY_ISSUE_TITLE" --body-file report.md
+          fi

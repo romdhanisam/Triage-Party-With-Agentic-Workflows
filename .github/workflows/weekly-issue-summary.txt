@@ -1,4 +1,4 @@
-name: Weekly Issue Summary
+name: Issue Summary
 
 on:
     push:
