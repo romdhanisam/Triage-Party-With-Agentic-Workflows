@@ -14,9 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_REPO: kubernetes-retired/dashboard
+      SOURCE_REPO: powsybl/powsybl-core
       TARGET_REPO: romdhanisam/Triage-Party-With-Agentic-Workflows
-      SUMMARY_ISSUE_TITLE: Triage Summary
+      SUMMARY_ISSUE_TITLE: Triage Summary 2
     steps:
       - uses: actions/checkout@v4
 
