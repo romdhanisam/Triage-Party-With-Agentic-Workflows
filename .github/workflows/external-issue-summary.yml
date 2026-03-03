@@ -3,7 +3,7 @@ name: External Repo Issue Summary
 on:
   push:
     branches:
-      - feat/models
+      - test/models
 permissions:
   contents: read
   issues: write
@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      SOURCE_REPO: powsybl/powsybl-core
+      SOURCE_REPO: kubernetes-retired/dashboard
       TARGET_REPO: romdhanisam/Triage-Party-With-Agentic-Workflows
       SUMMARY_ISSUE_TITLE: Triage Summary 2
     steps:

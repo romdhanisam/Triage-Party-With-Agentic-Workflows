@@ -1,8 +1,6 @@
 name: Issue Summary
 
 on:
-#  schedule:
-#    - cron: "0 8 * * 1"
   workflow_dispatch:
   push:
     branches:
@@ -18,8 +16,8 @@ jobs:
     runs-on: ubuntu-latest
     env:
       GH_TOKEN: ${{ github.token }}
-      REPO: romdhanisam/Triage-Party-With-Agentic-Workflows 
-      REPO_REPORT_ISSUE_CREATION: romdhanisam/Triage-Party-With-Agentic-Workflows 
+      SOURCE_REPO: kubernetes-retired/dashboard
+      TARGET_REPO: romdhanisam/Triage-Party-With-Agentic-Workflows
       SUMMARY_ISSUE_TITLE: Issue Summary - 4+ Year-Old Open Issues
       REPORT_MODEL: ${{ vars.ISSUE_SUMMARY_MODEL || 'openai/gpt-4.1-mini' }}
     steps:
@@ -34,11 +32,11 @@ jobs:
         run: |
           set -euo pipefail
 
-          ISSUES_ENABLED="$(gh repo view "$REPO" --json hasIssuesEnabled --jq '.hasIssuesEnabled')"
+          ISSUES_ENABLED="$(gh repo view "$SOURCE_REPO" --json hasIssuesEnabled --jq '.hasIssuesEnabled')"
           echo "issues_enabled=${ISSUES_ENABLED}" >> "$GITHUB_OUTPUT"
 
           if [ "$ISSUES_ENABLED" != "true" ]; then
-            echo "Issues are disabled for $REPO. Skipping summary generation."
+            echo "Issues are disabled for $SOURCE_REPO. Skipping summary generation."
             echo "cutoff_date=n/a" >> "$GITHUB_OUTPUT"
             echo "issue_count=0" >> "$GITHUB_OUTPUT"
             printf '[]' > old_issues.json
@@ -50,11 +48,11 @@ jobs:
           echo "cutoff_date=${CUTOFF_DATE}" >> "$GITHUB_OUTPUT"
 
           gh issue list \
-            --repo "$REPO" \
+            --repo "$SOURCE_REPO" \
             --state open \
             --limit 500 \
             --search "created:<${CUTOFF_DATE} sort:created-asc" \
-            --json number,title,body,url,createdAt,updatedAt,labels,assignees \
+            --json number,title,body,url,createdAt,updatedAt,labels \
             > old_issues.json
 
           ISSUE_COUNT="$(jq 'length' old_issues.json)"
@@ -68,7 +66,6 @@ jobs:
             "- Created: \(.createdAt)\n" +
             "- Updated: \(.updatedAt)\n" +
             "- Labels: " + (((.labels // []) | map(.name) | join(", ")) | if . == "" then "none" else . end) + "\n" +
-            "- Assignees: " + (((.assignees // []) | map(.login) | join(", ")) | if . == "" then "none" else . end) + "\n" +
             "- Body excerpt: " + ((.body // "" | gsub("\r"; "") | gsub("\n"; " ") | gsub("\\s+"; " ") | .[0:500])) + "\n"
           ' old_issues.json > issues_context.md
 
@@ -129,8 +126,8 @@ jobs:
 
           ## Actionable Next Steps
           1. Triage the top 3 oldest issues and decide: close, reproduce, or plan.
-          2. Add or refresh labels (`bug`, `enhancement`, `needs-info`, `help wanted`) for each prioritized issue.
-          3. Assign an owner for each selected issue and set a target milestone.
+          2. Not add or refresh labels (`bug`, `enhancement`, `needs-info`, `help wanted`) for each prioritized issue.
+          3. Not assign an owner for each selected issue and set a target milestone.
           4. Leave a status comment to re-engage reporters and contributors.
           EOF
             echo "used_fallback=true" >> "$GITHUB_OUTPUT"
@@ -155,20 +152,20 @@ jobs:
           EOF
 
           ISSUE_NUMBER="$(
-            gh issue list --repo "$REPO" --state open --limit 200 --json number,title \
+            gh issue list --repo "$SOURCE_REPO" --state open --limit 200 --json number,title \
             | jq -r --arg t "$SUMMARY_ISSUE_TITLE" '.[] | select(.title == $t) | .number' \
             | awk 'NR==1'
           )"
 
           if [ -n "$ISSUE_NUMBER" ]; then
-            gh issue comment "$ISSUE_NUMBER" --repo "$REPO_REPORT_ISSUE_CREATION" --body-file summary_comment.md
+            gh issue comment "$ISSUE_NUMBER" --repo "$TARGET_REPO" --body-file summary_comment.md
           else
             cat > summary_issue_body.md <<EOF
           This issue tracks a weekly summary for open issues older than 4 years.
 
           $(cat summary_comment.md)
           EOF
-            gh issue create --repo "$REPO_REPORT_ISSUE_CREATION" --title "$SUMMARY_ISSUE_TITLE" --body-file summary_issue_body.md
+            gh issue create --repo "$TARGET_REPO" --title "$SUMMARY_ISSUE_TITLE" --body-file summary_issue_body.md
           fi
 
       - name: Report skipped run when issues are disabled
